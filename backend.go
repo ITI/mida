@@ -108,7 +108,8 @@ func Backend(finalResultChan <-chan t.FinalMIDAResult, monitoringChan chan<- t.T
 					}
 
 					// Store our JavaScript trace to Mongo, if requested
-					if err == nil && r.SanitizedTask.JSTrace {
+					// CHANGE JUST FOR THIS BRANCH - ONLY STORE TRACE TO MONGO IF THERE IS WEBSOCKET TRAFFIC
+					if err == nil && r.SanitizedTask.JSTrace && len(r.WebsocketData) != 0 {
 						err = mongoConn.StoreJSTrace(&r)
 						if err != nil {
 							log.Log.Error(err)
