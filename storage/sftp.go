@@ -88,9 +88,7 @@ func CreateRemoteConnection(host string) (*t.SSHConn, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	log.Log.Info("SSH Host: ", host)
-	log.Log.Info("Full Host/Port: ", host + ":22")
-	c.Client, err = ssh.Dial("tcp", host + ":22", config)
+	c.Client, err = ssh.Dial("tcp", host+":22", config)
 	if err != nil {
 		return &c, err
 	}

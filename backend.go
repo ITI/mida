@@ -109,7 +109,9 @@ func Backend(finalResultChan <-chan t.FinalMIDAResult, monitoringChan chan<- t.T
 
 					// Store our JavaScript trace to Mongo, if requested
 					// CHANGE JUST FOR THIS BRANCH - ONLY STORE TRACE TO MONGO IF THERE IS WEBSOCKET TRAFFIC
+					log.Log.Infof("Length of websocket map for %s: %d", r.SanitizedTask.Url, len(r.WebsocketData))
 					if err == nil && r.SanitizedTask.JSTrace && len(r.WebsocketData) != 0 {
+						log.Log.Infof("Storing JSTrace for %s", r.SanitizedTask.Url)
 						err = mongoConn.StoreJSTrace(&r)
 						if err != nil {
 							log.Log.Error(err)
