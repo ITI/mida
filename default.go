@@ -39,8 +39,8 @@ func setDefaults() {
 const (
 	// MIDA Configuration Defaults
 
-	DefaultTaskAttempts         = 2
-	DefaultNavTimeout           = 7
+	DefaultTaskAttempts         = 1
+	DefaultNavTimeout           = 30
 	DefaultSSHBackoffMultiplier = 5
 	DefaultTaskPriority         = 5
 
@@ -58,23 +58,26 @@ const (
 	DefaultCompletionCondition = CompleteOnTimeoutOnly
 
 	// Defaults for data gathering settings
-	DefaultAllResources     = false
-	DefaultAllScripts       = false
-	DefaultJSTrace          = false
-	DefaultSaveRawTrace     = false
-	DefaultResourceMetadata = true
-	DefaultScriptMetadata   = true
-	DefaultResourceTree     = false
-	DefaultWebsocketTraffic = false
-	DefaultNetworkStrace    = false
-	DefaultOpenWPMChecks    = false
-	DefaultBrowserCoverage  = false
+	DefaultAllResources       = true
+	DefaultAllScripts         = true
+	DefaultJSTrace            = false
+	DefaultSaveRawTrace       = false
+	DefaultResourceMetadata   = true
+	DefaultScriptMetadata     = true
+	DefaultResourceTree       = false
+	DefaultWebsocketTraffic   = true
+	DefaultEventSourceTraffic = true
+	DefaultNetworkStrace      = false
+	DefaultOpenWPMChecks      = false
+	DefaultBrowserCoverage    = false
+	DefaultScreenShot         = true
 
-	// Other/Util
-
+	// Whether to shuffle order of task processing
+	DefaultShuffle = true
 )
 
 var DefaultBrowserFlags = []string{
+	"--enable-features=NetworkService",
 	"--disable-background-networking",
 	"--disable-background-timer-throttling",
 	"--disable-backgrounding-occluded-windows",

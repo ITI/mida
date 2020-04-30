@@ -136,6 +136,14 @@ func StoreResultsLocalFS(r *t.FinalMIDAResult, outpath string) error {
 		}
 	}
 
+	if r.SanitizedTask.ScreenShot {
+		err = os.Rename(path.Join(r.SanitizedTask.UserDataDirectory, r.SanitizedTask.RandomIdentifier, DefaultScreenShotFileName),
+			path.Join(outpath, DefaultScreenShotFileName))
+		if err != nil {
+			log.Log.Warn("Failed to capture screenshot")
+		}
+	}
+
 	// Store Websocket data (if specified)
 	if r.SanitizedTask.WebsocketTraffic {
 		data, err := json.Marshal(r.WebsocketData)
@@ -143,6 +151,19 @@ func StoreResultsLocalFS(r *t.FinalMIDAResult, outpath string) error {
 			log.Log.Error(err)
 		} else {
 			err = ioutil.WriteFile(path.Join(outpath, DefaultWebSocketTrafficFile), data, 0644)
+			if err != nil {
+				log.Log.Error(err)
+			}
+		}
+	}
+
+	// Store Event Source Message Data
+	if r.SanitizedTask.EventSourceTraffic {
+		data, err := json.Marshal(r.EventSourceData)
+		if err != nil {
+			log.Log.Error(err)
+		} else {
+			err = ioutil.WriteFile(path.Join(outpath, DefaultEventSourceDataFile), data, 0644)
 			if err != nil {
 				log.Log.Error(err)
 			}

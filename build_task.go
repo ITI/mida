@@ -123,6 +123,10 @@ func BuildCompressedTaskSet(cmd *cobra.Command, args []string) (t.CompressedMIDA
 	if err != nil {
 		return ts, err
 	}
+	*ts.Data.EventSourceTraffic, err = cmd.Flags().GetBool("event-source")
+	if err != nil {
+		return ts, err
+	}
 	*ts.Data.NetworkTrace, err = cmd.Flags().GetBool("network-strace")
 	if err != nil {
 		return ts, err
@@ -139,6 +143,10 @@ func BuildCompressedTaskSet(cmd *cobra.Command, args []string) (t.CompressedMIDA
 	if err != nil {
 		return ts, err
 	}
+	*ts.Data.ScreenShot, err = cmd.Flags().GetBool("screenshot")
+	if err != nil {
+		return ts, err
+	}
 
 	// Fill in output settings
 	*ts.Output.Path, err = cmd.Flags().GetString("results-output-path")
@@ -146,6 +154,10 @@ func BuildCompressedTaskSet(cmd *cobra.Command, args []string) (t.CompressedMIDA
 		return ts, err
 	}
 	*ts.Output.GroupID, err = cmd.Flags().GetString("group")
+	if err != nil {
+		return ts, err
+	}
+	*ts.Output.PostCrawlQueue, err = cmd.Flags().GetString("post-crawl-queue")
 	if err != nil {
 		return ts, err
 	}
@@ -157,6 +169,11 @@ func BuildCompressedTaskSet(cmd *cobra.Command, args []string) (t.CompressedMIDA
 	}
 
 	*ts.Priority, err = cmd.Flags().GetInt("priority")
+	if err != nil {
+		return ts, err
+	}
+
+	*ts.Repeat, err = cmd.Flags().GetInt("repeat")
 	if err != nil {
 		return ts, err
 	}
@@ -217,25 +234,31 @@ func InitializeCompressedTaskSet() t.CompressedMIDATaskSet {
 			TimeAfterLoad:       new(int),
 		},
 		Data: &t.DataSettings{
-			AllResources:     new(bool),
-			AllScripts:       new(bool),
-			JSTrace:          new(bool),
-			SaveRawTrace:     new(bool),
-			ResourceMetadata: new(bool),
-			ScriptMetadata:   new(bool),
-			ResourceTree:     new(bool),
-			WebsocketTraffic: new(bool),
-			NetworkTrace:     new(bool),
-			OpenWPMChecks:    new(bool),
-			BrowserCoverage:  new(bool),
+			AllResources:       new(bool),
+			AllScripts:         new(bool),
+			JSTrace:            new(bool),
+			SaveRawTrace:       new(bool),
+			ResourceMetadata:   new(bool),
+			ScriptMetadata:     new(bool),
+			ResourceTree:       new(bool),
+			WebsocketTraffic:   new(bool),
+			EventSourceTraffic: new(bool),
+			NetworkTrace:       new(bool),
+			OpenWPMChecks:      new(bool),
+			BrowserCoverage:    new(bool),
+			ScreenShot:         new(bool),
 		},
 		Output: &t.OutputSettings{
-			Path:     new(string),
-			GroupID:  new(string),
-			MongoURI: new(string),
+			Path:           new(string),
+			GroupID:        new(string),
+			PostCrawlQueue: new(string),
+			MongoURI:       new(string),
+			PostgresURI:    new(string),
+			PostgresDB:     new(string),
 		},
 		MaxAttempts: new(int),
 		Priority:    new(int),
+		Repeat:      new(int),
 	}
 	return cts
 }

@@ -45,15 +45,25 @@ func buildCommands() *cobra.Command {
 		allScripts       bool
 		resourceTree     bool
 		webSocket        bool
+		eventSource      bool
 		networkTrace     bool
 		openWPMChecks    bool
+		browserCoverage  bool
+		screenshot       bool
 
 		// Output settings
 		resultsOutputPath string // Results from task path
 		groupID           string
+		postCrawlQueue    string // Load path into AMQP after crawl (for postprocessing)
 
 		outputPath string // Task file path
 		overwrite  bool
+
+		// How many times a task should be repeated
+		repeat int
+
+		// For load: Shuffle tasks before loading
+		shuffle bool
 	)
 
 	var cmdBuild = &cobra.Command{
@@ -120,22 +130,31 @@ func buildCommands() *cobra.Command {
 		"Construct and store a best-effort dependency tree for resources encountered during crawl")
 	cmdBuild.Flags().BoolVarP(&webSocket, "websocket", "", DefaultWebsocketTraffic,
 		"Gather and store data and metadata on websocket messages")
+	cmdBuild.Flags().BoolVarP(&eventSource, "event-source", "", DefaultEventSourceTraffic,
+		"Gather and store event source (Server Sent Events) messages")
 	cmdBuild.Flags().BoolVarP(&networkTrace, "network-strace", "", DefaultNetworkStrace,
 		"Gather a raw trace of all networking system calls made by the browser")
 	cmdBuild.Flags().BoolVarP(&openWPMChecks, "openwpm-checks", "", DefaultOpenWPMChecks,
 		"Run OpenWPM fingerprinting checks on JavaScript trace")
-	cmdBuild.Flags().BoolVarP(&openWPMChecks, "browser-coverage", "", DefaultBrowserCoverage,
+	cmdBuild.Flags().BoolVarP(&browserCoverage, "browser-coverage", "", DefaultBrowserCoverage,
 		"Gather browser coverage data (requires browser instrumented for coverage)")
+	cmdBuild.Flags().BoolVarP(&screenshot, "screenshot", "", DefaultScreenShot,
+		"Collect a PNG screenshot of the web page after the load event fires")
 
 	cmdBuild.Flags().StringVarP(&resultsOutputPath, "results-output-path", "r", storage.DefaultOutputPath,
 		"Path (local or remote) to store results in. A new directory will be created inside this one for each task.")
 
 	cmdBuild.Flags().StringVarP(&outputPath, "outfile", "o", viper.GetString("taskfile"),
 		"Path to write the newly-created JSON task file")
+	cmdBuild.Flags().StringVarP(&postCrawlQueue, "post-crawl-queue", "", "",
+		"AMQP queue to load remote results path after results storage complete")
 	cmdBuild.Flags().BoolVarP(&overwrite, "overwrite", "x", false,
 		"Allow overwriting of an existing task file")
 	cmdBuild.Flags().StringVarP(&groupID, "group", "n", DefaultGroupID,
 		"Group ID used for identifying experiments")
+
+	cmdBuild.Flags().IntVarP(&repeat, "repeat", "", 1,
+		"How many times to repeat a given task")
 
 	_ = cmdBuild.MarkFlagRequired("urlfile")
 	_ = cmdBuild.MarkFlagFilename("urlfile")
@@ -200,20 +219,28 @@ to crawl, using default parameters where not specified`,
 		"Construct and store a best-effort dependency tree for resources encountered during crawl")
 	cmdGo.Flags().BoolVarP(&webSocket, "websocket", "", DefaultWebsocketTraffic,
 		"Gather and store data and metadata on websocket messages")
+	cmdGo.Flags().BoolVarP(&eventSource, "event-source", "", DefaultEventSourceTraffic,
+		"Gather and store event source (Server Sent Events) messages")
 	cmdGo.Flags().BoolVarP(&networkTrace, "network-strace", "", DefaultNetworkStrace,
 		"Gather a raw trace of all networking system calls made by the browser")
 	cmdGo.Flags().BoolVarP(&openWPMChecks, "openwpm-checks", "", DefaultOpenWPMChecks,
 		"Run OpenWPM fingerprinting checks on JavaScript trace")
-	cmdGo.Flags().BoolVarP(&openWPMChecks, "browser-coverage", "", DefaultBrowserCoverage,
+	cmdGo.Flags().BoolVarP(&browserCoverage, "browser-coverage", "", DefaultBrowserCoverage,
 		"Gather browser coverage data (requires browser instrumented for coverage)")
 	cmdGo.Flags().IntVarP(&priority, "priority", "", DefaultTaskPriority,
 		"Task priority (when loaded into RabbitMQ")
+	cmdGo.Flags().BoolVarP(&screenshot, "screenshot", "", DefaultScreenShot,
+		"Collect a PNG screenshot of the web page after the load event fires")
 
 	cmdGo.Flags().StringVarP(&resultsOutputPath, "results-output-path", "r", storage.DefaultOutputPath,
 		"Path (local or remote) to store results in. A new directory will be created inside this one for each task.")
+	cmdGo.Flags().StringVarP(&postCrawlQueue, "post-crawl-queue", "", "",
+		"AMQP queue to load remote results path after results storage complete")
 
 	cmdGo.Flags().StringVarP(&groupID, "group", "n", DefaultGroupID,
 		"Group ID used for identifying experiments")
+	cmdGo.Flags().IntVarP(&repeat, "repeat", "", 1,
+		"How many times to repeat a given task")
 
 	var cmdFile = &cobra.Command{
 		Use:   "file",
@@ -237,6 +264,8 @@ file, exiting when all tasks in the file are completed.`,
 
 	cmdFile.Flags().StringVarP(&taskfile, "taskfile", "f", viper.GetString("taskfile"),
 		"Task file to process")
+	cmdFile.Flags().BoolVarP(&shuffle, "shuffle", "", DefaultShuffle,
+		"Randomize processing order for tasks")
 	err := viper.BindPFlag("taskfile", cmdFile.Flags().Lookup("taskfile"))
 	if err != nil {
 		log.Log.Fatal(err)
@@ -262,13 +291,17 @@ file, exiting when all tasks in the file are completed.`,
 			if err != nil {
 				log.Log.Fatal(err)
 			}
-			numTasksLoaded, err := queue.AMQPLoadTasks(tasks)
+
+			numTasksLoaded, err := queue.AMQPLoadTasks(tasks, true)
 			if err != nil {
 				log.Log.Fatal(err)
 			}
 			log.Log.Infof("Loaded %d tasks into queue.", numTasksLoaded)
 		},
 	}
+
+	cmdLoad.Flags().BoolVarP(&shuffle, "shuffle", "",
+		DefaultShuffle, "Shuffle tasks before loading into queue (Default: True)")
 
 	var cmdClient = &cobra.Command{
 		Use:   "client",
@@ -286,6 +319,7 @@ lost.`,
 			if err != nil {
 				log.Log.Fatal(err)
 			}
+
 			InitPipeline(cmd, args)
 		},
 	}

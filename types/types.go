@@ -1,6 +1,7 @@
 package types
 
 import (
+	"database/sql"
 	"github.com/chromedp/cdproto/debugger"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
@@ -26,23 +27,28 @@ type CompletionSettings struct {
 }
 
 type DataSettings struct {
-	AllResources     *bool `json:"all_files"`
-	AllScripts       *bool `json:"all_scripts"`
-	JSTrace          *bool `json:"js_trace"`
-	SaveRawTrace     *bool `json:"save_raw_trace"`
-	ResourceMetadata *bool `json:"resource_metadata"`
-	ScriptMetadata   *bool `json:"script_metadata"`
-	ResourceTree     *bool `json:"resource_tree"`
-	WebsocketTraffic *bool `json:"websocket_traffic"`
-	NetworkTrace     *bool `json:"network_trace"`
-	OpenWPMChecks    *bool `json:"open_wpm_checks"`
-	BrowserCoverage  *bool `json:"browser_coverage"`
+	AllResources       *bool `json:"all_files"`
+	AllScripts         *bool `json:"all_scripts"`
+	JSTrace            *bool `json:"js_trace"`
+	SaveRawTrace       *bool `json:"save_raw_trace"`
+	ResourceMetadata   *bool `json:"resource_metadata"`
+	ScriptMetadata     *bool `json:"script_metadata"`
+	ResourceTree       *bool `json:"resource_tree"`
+	WebsocketTraffic   *bool `json:"websocket_traffic"`
+	EventSourceTraffic *bool `json:"event_source_traffic"`
+	NetworkTrace       *bool `json:"network_trace"`
+	OpenWPMChecks      *bool `json:"open_wpm_checks"`
+	BrowserCoverage    *bool `json:"browser_coverage"`
+	ScreenShot         *bool `json:"screenshot"`
 }
 
 type OutputSettings struct {
-	Path     *string `json:"path"`
-	GroupID  *string `json:"group_id"`
-	MongoURI *string `json:"mongo_uri,omitempty"`
+	Path           *string `json:"path"`
+	GroupID        *string `json:"group_id"`
+	PostCrawlQueue *string `json:"post_crawl_queue"`
+	MongoURI       *string `json:"mongo_uri,omitempty"`
+	PostgresURI    *string `json:"postgres_uri,omitempty"`
+	PostgresDB     *string `json:"postgres_db, omitempty"`
 }
 
 type MIDATask struct {
@@ -58,6 +64,9 @@ type MIDATask struct {
 
 	// Integer between one and ten (inclusive), sets priority in queue, defaults to 5
 	Priority *int `json:"priority,omitempty"`
+
+	// How many times to repeat task. Must be positive integer, defaults to 1
+	Repeat *int `json:"repeat"`
 }
 
 type MIDATaskSet []MIDATask
@@ -75,6 +84,9 @@ type CompressedMIDATaskSet struct {
 
 	// Integer between one and ten (inclusive), sets priority in queue, defaults to 5
 	Priority *int `json:"priority,omitempty"`
+
+	// How many times to repeat task. Must be positive integer, defaults to 1
+	Repeat *int `json:"repeat"`
 }
 
 // Crawl Completion Conditions
@@ -96,23 +108,28 @@ type SanitizedMIDATask struct {
 	TimeAfterLoad int                 `json:"time_after_load"`
 
 	// Data settings
-	AllResources     bool `json:"all_resources"`
-	AllScripts       bool `json:"all_scripts"`
-	JSTrace          bool `json:"js_trace"`
-	SaveRawTrace     bool `json:"save_raw_trace"`
-	ResourceMetadata bool `json:"resource_metadata"`
-	ScriptMetadata   bool `json:"script_metadata"`
-	ResourceTree     bool `json:"resource_tree"`
-	WebsocketTraffic bool `json:"websocket_traffic"`
-	NetworkTrace     bool `json:"network_trace"`
-	OpenWPMChecks    bool `json:"open_wpm_checks"`
-	BrowserCoverage  bool `json:"browser_coverage"`
+	AllResources       bool `json:"all_resources"`
+	AllScripts         bool `json:"all_scripts"`
+	JSTrace            bool `json:"js_trace"`
+	SaveRawTrace       bool `json:"save_raw_trace"`
+	ResourceMetadata   bool `json:"resource_metadata"`
+	ScriptMetadata     bool `json:"script_metadata"`
+	ResourceTree       bool `json:"resource_tree"`
+	WebsocketTraffic   bool `json:"websocket_traffic"`
+	EventSourceTraffic bool `json:"event_source_traffic"`
+	NetworkTrace       bool `json:"network_trace"`
+	OpenWPMChecks      bool `json:"open_wpm_checks"`
+	BrowserCoverage    bool `json:"browser_coverage"`
+	ScreenShot         bool `json:"screenshot"`
 
 	// Output Settings
 	OutputPath       string `json:"output_path"`
 	GroupID          string `json:"group_id"`
+	PostCrawlQueue   string `json:"post_crawl_queue"`
 	RandomIdentifier string `json:"random_identifier"`
 	MongoURI         string `json:"mongo_uri,omitempty"`
+	PostgresURI      string `json:"postgres_uri,omitempty"`
+	PostgresDB       string `json:"postgres_db,omitempty"`
 
 	// Parameters for retrying a task if it fails to complete
 	MaxAttempts      int      `json:"max_attempts"`
@@ -151,14 +168,16 @@ type HostInfo struct {
 }
 
 type RawMIDAResult struct {
-	CrawlHostInfo HostInfo
-	SanitizedTask SanitizedMIDATask
-	Stats         TaskStats
-	Requests      map[string][]network.EventRequestWillBeSent
-	Responses     map[string][]network.EventResponseReceived
-	Scripts       map[string]debugger.EventScriptParsed
-	FrameTree     *page.FrameTree
-	WebsocketData map[string]*WSConnection
+	CrawlHostInfo   HostInfo
+	SanitizedTask   SanitizedMIDATask
+	Stats           TaskStats
+	Requests        map[string][]network.EventRequestWillBeSent
+	Responses       map[string][]network.EventResponseReceived
+	DataLengths     map[string]int64
+	Scripts         map[string]debugger.EventScriptParsed
+	FrameTree       *page.FrameTree
+	WebsocketData   map[string]*WSConnection
+	EventSourceData map[string][]*network.EventEventSourceMessageReceived
 }
 
 type ResourceNode struct {
@@ -170,8 +189,9 @@ type ResourceNode struct {
 }
 
 type Resource struct {
-	Requests  []network.EventRequestWillBeSent `json:"requests"`
-	Responses []network.EventResponseReceived  `json:"responses"`
+	Requests        []network.EventRequestWillBeSent `json:"requests"`
+	Responses       []network.EventResponseReceived  `json:"responses"`
+	TotalDataLength int64                            `json:"totalDataLength"`
 
 	// MongoDB use only
 	ID    int64  `json:"-" bson:"_id"`
@@ -208,8 +228,9 @@ type FinalMIDAResult struct {
 	SanitizedTask    SanitizedMIDATask
 	ScriptMetadata   map[string]debugger.EventScriptParsed
 	Stats            TaskStats
-	JSTrace          *jstrace.JSTrace
+	JSTrace          *jstrace.CleanedJSTrace
 	WebsocketData    map[string]*WSConnection
+	EventSourceData  map[string][]*network.EventEventSourceMessageReceived
 	RTree            *ResourceTree
 }
 
@@ -246,4 +267,10 @@ type TaskStats struct {
 type SSHConn struct {
 	sync.Mutex
 	Client *ssh.Client
+}
+
+type DBConn struct {
+	sync.Mutex
+	Db          *sql.DB
+	CallNameMap map[string]int
 }

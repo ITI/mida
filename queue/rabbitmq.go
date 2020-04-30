@@ -7,7 +7,9 @@ import (
 	"github.com/teamnsrg/mida/log"
 	t "github.com/teamnsrg/mida/types"
 	"github.com/teamnsrg/mida/util"
+	"math/rand"
 	"os"
+	"time"
 )
 
 type Consumer struct {
@@ -19,7 +21,7 @@ type Consumer struct {
 
 // Takes an array of MIDATasks and loads them into a RabbitMQ queue
 // Requires the RabbitMQ URI (along with valid credentials)
-func AMQPLoadTasks(tasks []t.MIDATask) (int, error) {
+func AMQPLoadTasks(tasks []t.MIDATask, shuffle bool) (int, error) {
 	tasksLoaded := 0
 
 	// Build our URI, including creds. User and pass can be set with, in order
@@ -43,7 +45,25 @@ func AMQPLoadTasks(tasks []t.MIDATask) (int, error) {
 		return tasksLoaded, err
 	}
 
+	var expandedTasks []t.MIDATask
+
 	for _, task := range tasks {
+		if task.Repeat != nil {
+			for i := 0; i < *task.Repeat; i++ {
+				expandedTasks = append(expandedTasks, task)
+			}
+		} else {
+			expandedTasks = append(expandedTasks, task)
+		}
+	}
+
+	if shuffle {
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(expandedTasks),
+			func(i, j int) { expandedTasks[i], expandedTasks[j] = expandedTasks[j], expandedTasks[i] })
+	}
+
+	for _, task := range expandedTasks {
 		taskBytes, err := json.Marshal(task)
 		if err != nil {
 			return tasksLoaded, err
@@ -82,6 +102,46 @@ func AMQPLoadTasks(tasks []t.MIDATask) (int, error) {
 	}
 
 	return tasksLoaded, nil
+}
+
+func AMQPLoadStringInQueue(s string, q string) error {
+	rabbitURI := "amqp://" + viper.GetString("rabbitmquser") + ":" +
+		viper.GetString("rabbitmqpass") + "@" + viper.GetString("rabbitmqurl")
+
+	// TODO: TLS pls
+	connection, err := amqp.Dial(rabbitURI)
+	if err != nil {
+		return err
+	}
+
+	channel, err := connection.Channel()
+	if err != nil {
+		return err
+	}
+
+	err = channel.Publish(
+		"",    // Exchange
+		q,     // Key (queue)
+		false, // Mandatory
+		false, // Immediate
+		amqp.Publishing{
+			Headers:         amqp.Table{},
+			ContentType:     "text/plain",
+			ContentEncoding: "",
+			DeliveryMode:    0,
+			Priority:        5,
+			Body:            []byte(s),
+		})
+	if err != nil {
+		return err
+	}
+
+	err = connection.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func NewAMQPTasksConsumer() (*Consumer, <-chan amqp.Delivery, error) {

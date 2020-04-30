@@ -246,6 +246,11 @@ func SanitizeTask(mt t.MIDATask) (t.SanitizedMIDATask, error) {
 	} else {
 		st.WebsocketTraffic = DefaultWebsocketTraffic
 	}
+	if mt.Data.EventSourceTraffic != nil {
+		st.EventSourceTraffic = *mt.Data.EventSourceTraffic
+	} else {
+		st.EventSourceTraffic = DefaultEventSourceTraffic
+	}
 	if mt.Data.NetworkTrace != nil {
 		st.NetworkTrace = *mt.Data.NetworkTrace
 	} else {
@@ -260,6 +265,11 @@ func SanitizeTask(mt t.MIDATask) (t.SanitizedMIDATask, error) {
 		st.BrowserCoverage = *mt.Data.BrowserCoverage
 	} else {
 		st.BrowserCoverage = DefaultBrowserCoverage
+	}
+	if mt.Data.ScreenShot != nil {
+		st.ScreenShot = *mt.Data.ScreenShot
+	} else {
+		st.ScreenShot = DefaultScreenShot
 	}
 
 	///// END SANITIZE DATA GATHERING PARAMETERS /////
@@ -281,10 +291,32 @@ func SanitizeTask(mt t.MIDATask) (t.SanitizedMIDATask, error) {
 		st.GroupID = *mt.Output.GroupID
 	}
 
+	if mt.Output.PostCrawlQueue == nil || *mt.Output.PostCrawlQueue == "" {
+		st.PostCrawlQueue = ""
+	} else {
+		st.PostCrawlQueue = *mt.Output.PostCrawlQueue
+	}
+
 	if mt.Output.MongoURI == nil || *mt.Output.MongoURI == "" {
 		st.MongoURI = ""
 	} else {
 		st.MongoURI = *mt.Output.MongoURI
+	}
+
+	if mt.Output.PostgresURI == nil || *mt.Output.PostgresURI == "" {
+		st.PostgresURI = ""
+	} else {
+		st.PostgresURI = *mt.Output.PostgresURI
+	}
+
+	if mt.Output.PostgresDB == nil || *mt.Output.PostgresDB == "" {
+		st.PostgresDB = ""
+	} else {
+		if st.PostgresURI == "" {
+			log.Log.Error("You provided a PostgresDB param but no PostgresURI")
+		} else {
+			st.PostgresDB = *mt.Output.PostgresDB
+		}
 	}
 
 	///// END SANITIZE OUTPUT PARAMETERS /////
