@@ -1,14 +1,31 @@
-FROM ubuntu
+FROM golang:1.14
 
-RUN apt-get update && apt-get -y upgrade && apt-get -y install \
-  python3 ca-certificates chromium-browser tcpdump
+# Install latest version of chrome
+RUN curl -LO https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+RUN apt-get update && apt-get install -y ./google-chrome-stable_current_amd64.deb
+RUN rm google-chrome-stable_current_amd64.deb 
+RUN apt-get install -yq gconf-service libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgcc1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates fonts-liberation libappindicator1 libnss3 lsb-release xdg-utils wget x11vnc x11-xkb-utils xfonts-100dpi xfonts-75dpi xfonts-scalable xfonts-cyrillic x11-apps xvfb
 
-COPY setup.py /root
+RUN apt-get install dumb-init
 
-RUN python3 /root/setup.py 
+WORKDIR /mida
 
-COPY scripts/pcap-script.sh /root
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
 
-RUN chmod +x /root/pcap-script.sh
+# Copy MIDA source code into container
+COPY . .
 
-ENTRYPOINT ["/root/pcap-script.sh"]
+RUN go install
+RUN rm -rf *
+
+# Install the latest version of MIDA
+# RUN wget files.mida.sprai.org/setup.py
+# RUN python3 setup.py
+# RUN rm setup.py
+
+# Required so there is an init() process to kill zombies
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+CMD ["mida", "client", "-l3", "--xvfb"]
